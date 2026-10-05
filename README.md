@@ -1,4 +1,4 @@
-﻿# SOCPilot: Autonomous Security Alert Investigation Agent
+# Insider Threat Detector: Autonomous Security Alert Investigation System
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
@@ -6,122 +6,164 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC.svg)](https://tailwindcss.com/)
 [![ML](https://img.shields.io/badge/ML-Scikit--Learn%20%7C%20NetworkX-F7931E.svg)](https://scikit-learn.org/)
 
-**SOCPilot** is an end-to-end autonomous cybersecurity triage platform designed to reduce alert fatigue in modern Security Operations Centers (SOCs) while preserving 100% of true security incidents.
+**Insider Threat Detector** is an end-to-end cybersecurity investigation and triage platform designed to identify, analyze, correlate, and prioritize potential insider security threats.
 
-Ingesting real-world telemetry from the **Microsoft Security Incident Prediction benchmark dataset (`GUIDE_Train.csv`)**, SOCPilot deploys a 6-model ML intelligence pipeline, executes a multi-step **LangGraph** autonomous agent loop, and presents a sleek dark-mode React analyst console featuring a compact **Risk Heat Map**, interactive Recharts timelines, entity correlation attack graphs, and side-by-side triage comparison.
+The system combines machine learning, behavioral analysis, incident correlation, and autonomous investigation to help security analysts detect suspicious activities and reduce alert fatigue while maintaining visibility into genuine security incidents.
+
+Using real-world telemetry from the **Microsoft Security Incident Prediction benchmark dataset (`GUIDE_Train.csv`)**, Insider Threat Detector deploys a 6-component ML intelligence pipeline, executes a multi-step **LangGraph** autonomous investigation workflow, and provides a dark-mode React analyst console featuring risk visualization, interactive timelines, entity correlation graphs, and side-by-side alert analysis.
 
 ---
 
 ## 🌟 Key Features & Capabilities
 
 ### 1. Microsoft GUIDE Benchmark Ingestion & Zero-Setup Fallback
+
 - **Official GUIDE Schema Support**: Ingests `OrgId`, `IncidentId`, `AlertId`, `Timestamp`, `DetectorId`, `AlertTitle`, `Category`, `MitreTechniques`, `IncidentGrade` (`TruePositive`, `BenignPositive`, `FalsePositive`), `ActionGrouped`, `DeviceId`, `AccountUpn`, `IpAddress`, `Sha256`, and `Url`.
 - **High Null Handling**: Gracefully cleans and imputes columns with >40% null values.
-- **Built-in Fallback Benchmark**: Automatically synthesizes a 125-alert realistic cyber attack scenario dataset (Ransomware, Mimikatz, Cloud Identity Compromise, IT Scans, WAF noise) with zero manual setup required.
-
-### 2. Six AI/ML Intelligence Components (`ml_engine.py`) [Round 1]
-1. **Alert Classification Model**: TF-IDF + Random Forest / Gradient Boosting predicting threat category and tactic.
-2. **Alert Clustering Model**: Agglomerative clustering grouping alerts by shared entities (`AccountUpn`, `DeviceId`, `IpAddress`), temporal windows, and ground truth clusters.
-3. **Behavioral Anomaly Model**: IsolationForest identifying statistical outliers in user/device behavioral telemetry.
-4. **Threat-Severity Prediction Model**: ML engine estimating true `IncidentGrade` probability.
-5. **Incident Correlation Model**: NetworkX attack graph constructing relational topology across users, devices, IPs, and MITRE techniques.
-6. **Risk-Priority Scoring Model**: Composite scoring model ($0-100$) combining threat severity, anomaly score, blast radius, and graph density.
-
-### 3. LangGraph Autonomous Investigation Loop (`agent.py`) [Round 2]
-- **Multi-Step Investigation Workflow**:
-  1. *Scope & Entity Assessment*: Evaluates user privilege levels and asset criticality in Active Directory.
-  2. *Threat Intelligence Correlation*: Checks external IPs, URLs, and file hashes against VirusTotal / C2 trackers.
-  3. *Cross-Device Lateral Spread Analysis*: Correlates EDR events across endpoints to identify lateral movement.
-  4. *Behavioral Anomaly Synthesis*: Evaluates time-series deviations against 30-day baselines.
-  5. *Remediation Verdict*: Recommends automated actions (`Escalate`, `Group`, `Suppress`, `Request Review`).
-- **Dynamic Queue Re-Ranking**: Dynamically recalculates priority and reorganizes analyst queue based on discovered evidence.
-
-### 4. High-Performance Dark-Mode React Console [Round 3]
-- **Executive Metrics Bar**: Total Alert Volume, Compressed Incidents, Noise Reduction Rate ($90\%+$), Workload Reduction, and True Incident Preservation ($100\%$).
-- **Compact Risk Heat Map**: 2D Threat Severity vs Blast Radius matrix with interactive click-to-filter capability.
-- **Analyst Priority Queue**: Searchable, filterable queue with severity bars, action tags, and affected entities.
-- **Incident Investigation Panel**:
-  - *Recharts Interactive Event Timeline*
-  - *NetworkX Visual Attack Graph*
-  - *GUIDE Telemetry Breakdown Table*
-  - *Autonomous Agent Reasoning & Evidence Trace*
-  - *Analyst Action & Feedback Buttons*
-- **Side-by-Side Comparison Mode**: Visual demonstration of Raw Alert Triage (125 unorganized alerts) vs. SOCPilot Autonomous AI Triage (7 actionable incidents, $94.2\%$ noise filtered).
+- **Built-in Fallback Benchmark**: Automatically synthesizes a realistic 125-alert cybersecurity scenario dataset covering Ransomware, Mimikatz, Cloud Identity Compromise, IT Scans, and WAF noise.
+- **Insider Threat Focus**: Uses account, device, IP, behavioral, and alert information to identify suspicious activity associated with potential insider threats.
 
 ---
 
-## 🏗️ Project Architecture
+### 2. Six AI/ML Intelligence Components (`ml_engine.py`)
+
+1. **Alert Classification Model**
+   - Uses TF-IDF with Random Forest / Gradient Boosting.
+   - Predicts threat categories and tactics.
+
+2. **Alert Clustering Model**
+   - Groups related alerts using shared entities such as:
+     - `AccountUpn`
+     - `DeviceId`
+     - `IpAddress`
+   - Also considers temporal relationships and ground-truth clusters.
+
+3. **Behavioral Anomaly Detection**
+   - Uses Isolation Forest to identify unusual user and device behavior.
+
+4. **Threat Severity Prediction**
+   - Estimates the probability that an alert represents a genuine security incident.
+
+5. **Incident Correlation Model**
+   - Uses NetworkX to construct relationships between:
+     - Users
+     - Devices
+     - IP addresses
+     - MITRE ATT&CK techniques
+     - Security alerts
+
+6. **Risk Priority Scoring**
+   - Produces a risk score from **0–100**.
+   - Combines:
+     - Threat severity
+     - Behavioral anomaly
+     - Blast radius
+     - Attack graph density
+
+---
+
+## 3. LangGraph Autonomous Investigation Loop (`agent.py`)
+
+The system performs a multi-step investigation workflow:
+
+1. **Scope & Entity Assessment**
+   - Evaluates affected users, devices, privileges, and asset criticality.
+
+2. **Threat Intelligence Correlation**
+   - Correlates external IP addresses, URLs, and file hashes with threat intelligence sources.
+
+3. **Cross-Device Lateral Spread Analysis**
+   - Correlates endpoint activity to identify possible lateral movement.
+
+4. **Behavioral Anomaly Analysis**
+   - Compares observed activity against established behavioral patterns.
+
+5. **Remediation Verdict**
+   - Generates recommended actions such as:
+     - `Escalate`
+     - `Group`
+     - `Suppress`
+     - `Request Review`
+
+6. **Dynamic Priority Re-Ranking**
+   - Recalculates investigation priority based on newly discovered evidence.
+
+---
+
+## 4. Dark-Mode React Security Console
+
+The frontend provides an analyst-oriented security dashboard containing:
+
+- **Executive Metrics**
+  - Total Alert Volume
+  - Investigated Incidents
+  - Threat Detection Rate
+  - Workload Reduction
+  - Risk Distribution
+
+- **Risk Heat Map**
+  - Visualizes threat severity against potential blast radius.
+
+- **Analyst Priority Queue**
+  - Searchable and filterable security alert queue.
+  - Displays severity, risk score, affected entities, and recommended actions.
+
+- **Incident Investigation Panel**
+  - Interactive event timeline
+  - NetworkX attack graph
+  - Security telemetry breakdown
+  - Autonomous investigation results
+  - Evidence trace
+  - Analyst feedback and actions
+
+- **Alert Comparison**
+  - Compares raw security alerts against AI-assisted investigation and prioritization.
+
+---
+
+# 🏗️ Project Architecture
 
 ```text
-socpilot/
+insider-threat-detector/
+│
 ├── backend/
 │   ├── app/
 │   │   ├── db/
-│   │   │   ├── database.py       # Dual-engine DB (MSSQL / SQLite fallback)
-│   │   │   └── models.py         # SQLAlchemy models matching GUIDE schema
+│   │   │   ├── database.py
+│   │   │   └── models.py
+│   │   │
 │   │   ├── services/
-│   │   │   ├── guide_loader.py   # Microsoft GUIDE parser & 125-alert generator
-│   │   │   ├── ml_engine.py      # 6 ML intelligence components
-│   │   │   └── agent.py          # LangGraph autonomous investigation agent
-│   │   ├── config.py             # Pydantic settings & environment configuration
-│   │   └── main.py               # FastAPI REST API endpoints
+│   │   │   ├── guide_loader.py
+│   │   │   ├── ml_engine.py
+│   │   │   └── agent.py
+│   │   │
+│   │   ├── config.py
+│   │   └── main.py
+│   │
 │   ├── data/
-│   │   └── GUIDE_Train.csv       # Microsoft GUIDE dataset / benchmark
+│   │   └── GUIDE_Train.csv
+│   │
 │   ├── requirements.txt
 │   ├── .env.example
 │   └── .env
+│
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── MetricsOverview.tsx  # KPI Cards
-│   │   │   ├── RiskHeatmap.tsx      # Compact 2D Risk Heat Map
-│   │   │   ├── PriorityQueue.tsx    # Analyst Priority Queue
-│   │   │   ├── IncidentDetail.tsx   # Timeline, Graph, Alerts & Evidence
-│   │   │   └── ComparisonView.tsx   # Raw vs AI Comparison View
+│   │   │   ├── MetricsOverview.tsx
+│   │   │   ├── RiskHeatmap.tsx
+│   │   │   ├── PriorityQueue.tsx
+│   │   │   ├── IncidentDetail.tsx
+│   │   │   └── ComparisonView.tsx
+│   │   │
 │   │   ├── types/
-│   │   │   └── index.ts             # TypeScript definitions
-│   │   ├── App.tsx                  # Main App shell
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── App.tsx
 │   │   ├── main.tsx
 │   │   └── index.css
+│   │
 │   ├── package.json
 │   └── vite.config.ts
+│
 └── README.md
-```
-
----
-
-## 🚀 Quick Start Guide
-
-### 1. Start Backend (FastAPI)
-```bash
-cd socpilot/backend
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-*The backend will automatically create `socpilot.db`, ingest the Microsoft GUIDE benchmark data, execute the 6 ML models, and run the agent loop upon startup.*
-
-### 2. Start Frontend (React + Vite)
-```bash
-cd socpilot/frontend
-npm install
-npm run dev
-```
-*Access the dashboard at `http://localhost:5173`.*
-
----
-
-## 📊 REST API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/load-guide-dataset` | Ingest local GUIDE CSV or generate mock dataset |
-| `POST` | `/api/process-pipeline` | Execute 6-component ML intelligence pipeline |
-| `POST` | `/api/run-agent` | Run LangGraph autonomous investigation loop |
-| `GET` | `/api/incidents` | Return prioritized queue, risk scores, and entity summaries |
-| `GET` | `/api/incidents/{id}` | Return single incident telemetry, attack graph, and agent logs |
-| `GET` | `/api/metrics` | Return compression ratio, noise reduction %, and workload reduction |
-| `GET` | `/api/comparison` | Return side-by-side Raw vs AI prioritization metrics |
-| `POST` | `/api/feedback` | Record analyst approvals, overrides, and grade adjustments |
-
----
-
