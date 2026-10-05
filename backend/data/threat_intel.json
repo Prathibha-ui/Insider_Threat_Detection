@@ -1,0 +1,92 @@
+[
+  {
+    "indicator": "185.220.101.42",
+    "type": "ip",
+    "malicious": true,
+    "confidence": 0.98,
+    "source": "AlienVault OTX / AbuseIPDB",
+    "last_seen": "2026-09-28T14:32:00Z",
+    "tags": ["tor-exit", "c2", "ransomware-drop"]
+  },
+  {
+    "indicator": "194.26.29.112",
+    "type": "ip",
+    "malicious": true,
+    "confidence": 0.95,
+    "source": "ThreatFox C2 Tracker",
+    "last_seen": "2026-09-30T09:15:00Z",
+    "tags": ["c2-controller", "cloud-token-exfiltration"]
+  },
+  {
+    "indicator": "45.33.32.156",
+    "type": "ip",
+    "malicious": true,
+    "confidence": 0.96,
+    "source": "Feodo Tracker",
+    "last_seen": "2026-10-01T11:45:00Z",
+    "tags": ["cobalt-strike", "supply-chain-c2"]
+  },
+  {
+    "indicator": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+    "type": "hash",
+    "malicious": true,
+    "confidence": 0.99,
+    "source": "MalwareBazaar",
+    "last_seen": "2026-09-27T16:20:00Z",
+    "tags": ["ransomware", "trojan-dropper"]
+  },
+  {
+    "indicator": "8c42b0c3679c2ef3bf3589b3f6e1f0e21074e2d3b4f9f743ab98d89a26315efb",
+    "type": "hash",
+    "malicious": true,
+    "confidence": 0.99,
+    "source": "VirusTotal Benchmark Corpus",
+    "last_seen": "2026-09-25T18:00:00Z",
+    "tags": ["mimikatz", "hacktool", "lsass-dump"]
+  },
+  {
+    "indicator": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "type": "hash",
+    "malicious": false,
+    "confidence": 0.05,
+    "source": "Known Clean Hashes (Empty Hash)",
+    "last_seen": "2026-10-01T00:00:00Z",
+    "tags": ["zero-byte", "benign"]
+  },
+  {
+    "indicator": "malicious-doc-share.ru",
+    "type": "domain",
+    "malicious": true,
+    "confidence": 0.97,
+    "source": "URLhaus Malicious Domain Feed",
+    "last_seen": "2026-09-29T21:10:00Z",
+    "tags": ["malicious-macro-host", "phishing"]
+  },
+  {
+    "indicator": "update-packages.globalcdn-delivery.net",
+    "type": "domain",
+    "malicious": true,
+    "confidence": 0.94,
+    "source": "ThreatConnect Supply Chain Domain",
+    "last_seen": "2026-09-30T13:40:00Z",
+    "tags": ["dll-hijack", "impersonation"]
+  },
+  {
+    "indicator": "portal.acme.com",
+    "type": "domain",
+    "malicious": false,
+    "confidence": 0.02,
+    "source": "Corporate Internal DNS Zone",
+    "last_seen": "2026-10-02T08:00:00Z",
+    "tags": ["internal", "corporate"]
+  },
+  {
+    "indicator": "graph.microsoft.com",
+    "type": "domain",
+    "malicious": false,
+    "confidence": 0.01,
+    "source": "Microsoft Cloud Endpoints",
+    "last_seen": "2026-10-02T10:00:00Z",
+    "tags": ["trusted", "cloud-provider"]
+  }
+]
