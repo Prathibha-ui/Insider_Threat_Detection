@@ -11,6 +11,29 @@ class FeedbackRequest(BaseModel):
 class IngestionRequest(BaseModel):
     custom_filepath: Optional[str] = None
 
+class UserAlertInput(BaseModel):
+    title: str = Field(..., description="Alert Title / Threat Name")
+    category: str = Field("Execution", description="MITRE Tactic / Category")
+    severity: str = Field("High", description="Severity: Critical, High, Medium, Low, Informational")
+    device_id: Optional[str] = Field("FIN-WS-101", description="Device ID / Hostname")
+    account_upn: Optional[str] = Field("user@corp.local", description="User Account UPN")
+    ip_address: Optional[str] = Field("185.220.101.42", description="Observed IP Address")
+    sha256: Optional[str] = Field(None, description="SHA256 File Hash")
+    url: Optional[str] = Field(None, description="Associated URL / Domain")
+    mitre_techniques: Optional[str] = Field(None, description="MITRE ATT&CK Technique ID, e.g. T1059.001")
+    action_grouped: Optional[str] = Field("Detected", description="Sensor Action: Detected, Blocked, Quarantined")
+    mitigation: Optional[str] = Field(None, description="Suggested action / mitigation")
+    source: Optional[str] = Field("EDR Sensor", description="Detection Source")
+
+class BatchAlertInput(BaseModel):
+    alerts: List[UserAlertInput]
+
+class IngestResponse(BaseModel):
+    status: str
+    alert_ids: List[str]
+    incident_id: Optional[str] = None
+    message: str
+
 class DemoAlertRequest(BaseModel):
     title: str = Field(..., description="Alert title")
     category: str = Field(..., description="Security category or tactic")

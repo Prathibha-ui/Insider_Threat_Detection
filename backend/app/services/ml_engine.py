@@ -160,7 +160,9 @@ class MLEngine:
         """
         alerts = db.query(Alert).all()
         if not alerts:
-            return {"status": "error", "message": "No alerts found in database."}
+            db.query(Incident).delete()
+            db.commit()
+            return {"status": "success", "processed_alerts": 0, "created_incidents": 0}
 
         logger.info(f"Executing ML pipeline for {len(alerts)} alerts.")
 

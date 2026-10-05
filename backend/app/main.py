@@ -1,4 +1,5 @@
 import json
+import uuid
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -14,6 +15,9 @@ from app.models import Alert, Incident, Evidence, AgentReasoningLog, AnalystFeed
 from app.schemas import (
     FeedbackRequest,
     IngestionRequest,
+    UserAlertInput,
+    BatchAlertInput,
+    IngestResponse,
     DemoAlertRequest,
     DemoAlertResponse,
     HealthResponse,
@@ -36,22 +40,8 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing SOCPilot backend services...")
     init_db()
-    db = SessionLocal()
-    try:
-        alert_count = db.query(Alert).count()
-        if alert_count == 0:
-            logger.info("Database empty. Auto-ingesting Microsoft GUIDE benchmark dataset...")
-            if settings.DATASET_PATH.exists():
-                ingest_guide_dataset(settings.DATASET_PATH, db)
-                execute_ml_pipeline(db)
-                run_agent_investigation_loop(db)
-                logger.info("SOCPilot auto-initialization complete.")
-            else:
-                logger.warning(f"GUIDE dataset not found at {settings.DATASET_PATH}")
-    except Exception as e:
-        logger.error(f"Error during auto-initialization: {e}", exc_info=True)
-    finally:
-        db.close()
+    # Ready for user input - no forced demo data ingestion on startup
+    logger.info("SOCPilot backend ready. Awaiting telemetry and user inputs.")
     yield
     # Shutdown
     logger.info("Shutting down SOCPilot backend.")
@@ -112,6 +102,102 @@ def health_endpoint(db: Session = Depends(get_db)):
         threat_intel_provider=threat_intel_service.provider_name,
         dataset_exists=settings.DATASET_PATH.exists()
     )
+
+@app.post("/api/ingest-alert", response_model=IngestResponse)
+def ingest_user_alert_endpoint(payload: UserAlertInput, db: Session = Depends(get_db)):
+    """
+    Ingests a user-provided security alert into the system,
+    runs correlation & ML intelligence pipeline, and executes the
+    LangGraph agent investigation loop to generate real-time triage.
+    """
+    alert_id = f"ALT-USR-{uuid.uuid4().hex[:8].upper()}"
+    new_alert = Alert(
+        AlertId=alert_id,
+        AlertTitle=payload.title.strip(),
+        Category=payload.category.strip(),
+        Severity=payload.severity.strip(),
+        ActionGrouped=payload.action_grouped.strip() if payload.action_grouped else "Detected",
+        Timestamp=datetime.utcnow(),
+        DeviceId=payload.device_id.strip() if payload.device_id else "DEV-UNKNOWN",
+        AccountUpn=payload.account_upn.strip() if payload.account_upn else "corp\\unknown",
+        IpAddress=payload.ip_address.strip() if payload.ip_address else "0.0.0.0",
+        Sha256=payload.sha256.strip() if payload.sha256 else "N/A",
+        Url=payload.url.strip() if payload.url else "N/A",
+        MitreTechniques=payload.mitre_techniques.strip() if payload.mitre_techniques else "N/A",
+        IncidentGrade="TruePositive" if payload.severity in ["Critical", "High"] else "BenignPositive",
+        AnomalyScore=0.0
+    )
+    db.add(new_alert)
+    db.commit()
+    db.refresh(new_alert)
+
+    # Run ML correlation and risk pipeline
+    execute_ml_pipeline(db)
+
+    # Find the assigned incident cluster
+    refreshed_alert = db.query(Alert).filter(Alert.AlertId == alert_id).first()
+    cluster_id = refreshed_alert.ClusterId if refreshed_alert else None
+
+    # Run LangGraph agent loop to build evidence & reasoning
+    run_agent_investigation_loop(db)
+
+    return IngestResponse(
+        status="success",
+        alert_ids=[alert_id],
+        incident_id=cluster_id,
+        message=f"Alert {alert_id} successfully ingested and investigated."
+    )
+
+@app.post("/api/ingest-batch-alerts", response_model=IngestResponse)
+def ingest_batch_alerts_endpoint(payload: BatchAlertInput, db: Session = Depends(get_db)):
+    """
+    Ingests a batch of user-provided security alerts.
+    """
+    alert_ids = []
+    for item in payload.alerts:
+        aid = f"ALT-USR-{uuid.uuid4().hex[:8].upper()}"
+        alert_ids.append(aid)
+        a = Alert(
+            AlertId=aid,
+            AlertTitle=item.title.strip(),
+            Category=item.category.strip(),
+            Severity=item.severity.strip(),
+            ActionGrouped=item.action_grouped.strip() if item.action_grouped else "Detected",
+            Timestamp=datetime.utcnow(),
+            DeviceId=item.device_id.strip() if item.device_id else "DEV-UNKNOWN",
+            AccountUpn=item.account_upn.strip() if item.account_upn else "corp\\unknown",
+            IpAddress=item.ip_address.strip() if item.ip_address else "0.0.0.0",
+            Sha256=item.sha256.strip() if item.sha256 else "N/A",
+            Url=item.url.strip() if item.url else "N/A",
+            MitreTechniques=item.mitre_techniques.strip() if item.mitre_techniques else "N/A",
+            IncidentGrade="TruePositive" if item.severity in ["Critical", "High"] else "BenignPositive",
+            AnomalyScore=0.0
+        )
+        db.add(a)
+
+    db.commit()
+    execute_ml_pipeline(db)
+    run_agent_investigation_loop(db)
+
+    return IngestResponse(
+        status="success",
+        alert_ids=alert_ids,
+        incident_id=None,
+        message=f"Batch of {len(alert_ids)} alerts successfully ingested and investigated."
+    )
+
+@app.post("/api/clear-data")
+def clear_data_endpoint(db: Session = Depends(get_db)):
+    """
+    Clears all telemetry, incidents, evidence, logs, and feedback to reset to a clean blank state.
+    """
+    db.query(AgentReasoningLog).delete()
+    db.query(Evidence).delete()
+    db.query(AnalystFeedback).delete()
+    db.query(Alert).delete()
+    db.query(Incident).delete()
+    db.commit()
+    return {"status": "success", "message": "All incident and alert data cleared successfully."}
 
 @app.post("/api/load-guide-dataset")
 def load_guide_dataset_endpoint(req: Optional[IngestionRequest] = None, db: Session = Depends(get_db)):
@@ -320,10 +406,10 @@ def get_metrics_endpoint(db: Session = Depends(get_db)):
     ).count()
 
     noise_reduction_pct = round((suppressed_alerts / total_alerts * 100), 1) if total_alerts > 0 else 0.0
-    compression_ratio = f"{round((total_alerts / max(total_incidents, 1)), 1)}:1"
+    compression_ratio = f"{round((total_alerts / max(total_incidents, 1)), 1)}:1" if total_alerts > 0 else "0:0"
 
     # Workload reduction based on incidents needing escalation vs total raw alerts
-    workload_reduction_pct = round(100.0 - ((escalated_incidents / max(total_alerts, 1)) * 100.0), 1)
+    workload_reduction_pct = round(100.0 - ((escalated_incidents / max(total_alerts, 1)) * 100.0), 1) if total_alerts > 0 else 0.0
 
     # True positive preservation rate (check whether all ground-truth TruePositive alerts are retained in actionable incidents)
     tp_alerts = db.query(Alert).filter(Alert.IncidentGrade == "TruePositive").all()
@@ -337,7 +423,7 @@ def get_metrics_endpoint(db: Session = Depends(get_db)):
         preserved_tp = len(tp_clusters) - suppressed_tp_clusters
         tp_preservation_pct = round((preserved_tp / len(tp_clusters)) * 100.0, 1)
     else:
-        tp_preservation_pct = 100.0
+        tp_preservation_pct = 100.0 if total_alerts > 0 else 0.0
 
     return MetricsResponse(
         total_alerts=total_alerts,

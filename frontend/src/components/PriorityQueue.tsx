@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   AlertOctagon, 
   GitMerge, 
@@ -171,8 +171,16 @@ export const PriorityQueue: React.FC<Props> = ({
       {/* Incident List */}
       <div className="flex-1 overflow-y-auto divide-y divide-border/60 p-1.5 space-y-1">
         {sortedIncidents.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-xs">
-            No incidents match your current search or filter.
+          <div className="flex flex-col items-center justify-center h-full py-12 px-4 text-center">
+            <div className="p-3 rounded-full bg-slate-900 border border-slate-800 text-slate-500 mb-3">
+              <Layers className="w-6 h-6 text-slate-500" />
+            </div>
+            <h4 className="text-xs font-semibold text-slate-300">No Active Incidents</h4>
+            <p className="text-[11px] text-slate-500 mt-1 max-w-[220px]">
+              {incidents.length === 0
+                ? 'Ingest an alert using the form above or pick a scenario preset to run autonomous triage.'
+                : 'No incidents match your current search or filter.'}
+            </p>
           </div>
         ) : (
           sortedIncidents.map((inc) => {

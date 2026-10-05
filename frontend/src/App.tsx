@@ -16,7 +16,7 @@ import { RiskHeatmap } from './components/RiskHeatmap';
 import { PriorityQueue } from './components/PriorityQueue';
 import { IncidentDetail } from './components/IncidentDetail';
 import { ComparisonView } from './components/ComparisonView';
-import { DemoAlertPanel, DemoAlertInput, DemoAlertResult } from './components/DemoAlertPanel';
+import { AlertIngestConsole, AlertInputData } from './components/AlertIngestConsole';
 import { Incident, Metrics, IncidentDetailResponse, ComparisonData } from './types';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -45,13 +45,21 @@ export function App() {
       const incJson = await incRes.json();
       const metJson = await metRes.json();
 
-      setIncidents(incJson.incidents || []);
+      const incs = incJson.incidents || [];
+      setIncidents(incs);
       setMetrics(metJson);
 
-      // Auto-select first critical/high incident if none selected
-      if (incJson.incidents && incJson.incidents.length > 0) {
-        const topInc = incJson.incidents[0];
-        setSelectedIncidentId((prev) => prev || topInc.incident_id);
+      // Auto-select first incident if current selected doesn't exist
+      if (incs.length > 0) {
+        setSelectedIncidentId((prev) => {
+          if (prev && incs.some((i: Incident) => i.incident_id === prev)) {
+            return prev;
+          }
+          return incs[0].incident_id;
+        });
+      } else {
+        setSelectedIncidentId(null);
+        setIncidentDetail(null);
       }
     } catch (err) {
       console.error('Failed to load SOCPilot data:', err);
@@ -96,6 +104,8 @@ export function App() {
   useEffect(() => {
     if (selectedIncidentId) {
       fetchIncidentDetail(selectedIncidentId);
+    } else {
+      setIncidentDetail(null);
     }
   }, [selectedIncidentId]);
 
@@ -165,24 +175,66 @@ export function App() {
     }
   };
 
-  const handleRunDemoAlert = async (payload: DemoAlertInput): Promise<DemoAlertResult | null> => {
+  const handleIngestAlert = async (payload: AlertInputData) => {
     try {
-      const res = await fetch(`${API_BASE}/api/demo-live-alert`, {
+      const res = await fetch(`${API_BASE}/api/ingest-alert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
-        console.error('Live demo request failed');
-        return null;
+        return { success: false, message: 'Server error while ingesting alert.' };
       }
 
-      const json = await res.json();
-      return json;
+      const data = await res.json();
+      await fetchData();
+
+      if (data.incident_id) {
+        setSelectedIncidentId(data.incident_id);
+        await fetchIncidentDetail(data.incident_id);
+      }
+
+      return {
+        success: true,
+        incident_id: data.incident_id,
+        message: data.message
+      };
+    } catch (err: any) {
+      console.error('Failed to ingest alert:', err);
+      return { success: false, message: err?.message || 'Network error' };
+    }
+  };
+
+  const handleIngestBatch = async (alerts: AlertInputData[]) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/ingest-batch-alerts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alerts })
+      });
+
+      if (!res.ok) {
+        return { success: false, message: 'Server error ingesting batch alerts.' };
+      }
+
+      const data = await res.json();
+      await fetchData();
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      console.error('Failed to ingest batch:', err);
+      return { success: false, message: err?.message || 'Network error' };
+    }
+  };
+
+  const handleClearAllData = async () => {
+    try {
+      await fetch(`${API_BASE}/api/clear-data`, { method: 'POST' });
+      setSelectedIncidentId(null);
+      setIncidentDetail(null);
+      await fetchData();
     } catch (err) {
-      console.error('Error running live demo:', err);
-      return null;
+      console.error('Failed to clear data:', err);
     }
   };
 
@@ -284,7 +336,13 @@ export function App() {
           />
         ) : (
           <div className="space-y-4">
-            <DemoAlertPanel onRunDemo={handleRunDemoAlert} />
+            <AlertIngestConsole
+              onIngestAlert={handleIngestAlert}
+              onIngestBatch={handleIngestBatch}
+              onClearAllData={handleClearAllData}
+              loading={loading}
+              totalIncidents={incidents.length}
+            />
 
             {/* Small Risk Heat Map (Specifically requested!) */}
             <RiskHeatmap

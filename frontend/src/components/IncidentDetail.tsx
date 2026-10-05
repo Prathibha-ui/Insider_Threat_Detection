@@ -53,10 +53,12 @@ export const IncidentDetail: React.FC<Props> = ({ data, loading, onFeedbackSubmi
   if (!data) {
     return (
       <div className="h-full bg-surface rounded-xl border border-border p-6 flex flex-col items-center justify-center text-slate-500 text-center">
-        <ShieldAlert className="w-12 h-12 mb-3 text-slate-600" />
-        <h3 className="text-base font-semibold text-slate-300">Select an Incident to Investigate</h3>
-        <p className="text-xs text-slate-500 max-w-sm mt-1">
-          Choose a correlated incident from the Analyst Priority Queue to inspect the attack graph, timeline, and agent reasoning.
+        <div className="p-4 rounded-full bg-slate-900 border border-slate-800 text-slate-500 mb-3">
+          <ShieldAlert className="w-10 h-10 text-slate-500" />
+        </div>
+        <h3 className="text-base font-semibold text-slate-300">Awaiting Alert Telemetry</h3>
+        <p className="text-xs text-slate-500 max-w-md mt-1">
+          Use the <strong>Security Alert Ingestion Console</strong> above or select a <strong>Threat Scenario Preset</strong> to ingest an alert and trigger real-time ML risk scoring, attack graph correlation, and the LangGraph reasoning loop.
         </p>
       </div>
     );

@@ -526,7 +526,7 @@ def run_agent_investigation_loop(db: Session) -> Dict[str, Any]:
     """
     incidents = db.query(Incident).all()
     if not incidents:
-        return {"status": "error", "message": "No incidents found to investigate."}
+        return {"status": "success", "investigated_incidents": 0, "details": []}
 
     results = []
     for inc in incidents:
