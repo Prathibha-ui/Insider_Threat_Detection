@@ -25,5 +25,17 @@ def get_db():
 
 def init_db():
     from app import models
+    from sqlalchemy import inspect, text
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        if "alerts" in inspector.get_table_names():
+            columns = inspector.get_columns("alerts")
+            # If legacy table has NOT NULL on Category, drop table so create_all re-creates clean table
+            category_col = next((c for c in columns if c["name"] == "Category"), None)
+            if category_col and not category_col.get("nullable", True):
+                conn.execute(text("DROP TABLE alerts"))
+                conn.commit()
+
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables initialized successfully.")

@@ -79,20 +79,28 @@ class HealthResponse(BaseModel):
     dataset_exists: bool
 
 class AlertResponse(BaseModel):
-    alert_id: str
-    title: str
-    category: str
-    severity: str
-    timestamp: Optional[str]
-    device_id: Optional[str]
-    account_upn: Optional[str]
-    ip_address: Optional[str]
-    sha256: Optional[str]
-    url: Optional[str]
-    mitre: Optional[str]
-    action: Optional[str]
-    grade: Optional[str]
-    anomaly_score: float
+    id: Optional[int] = None
+    alert_id: Optional[str] = None
+    title: Optional[str] = None
+    category: Optional[str] = None
+    alert_type: Optional[str] = None
+    severity: Optional[str] = None
+    timestamp: Optional[str] = None
+    device_id: Optional[str] = None
+    account_upn: Optional[str] = None
+    ip_address: Optional[str] = None
+    sha256: Optional[str] = None
+    url: Optional[str] = None
+    mitre: Optional[str] = None
+    action: Optional[str] = None
+    grade: Optional[str] = None
+    incident_grade: Optional[str] = None
+    anomaly_score: float = 0.0
+    risk_score: Optional[float] = 0.0
+    threat_level: Optional[str] = None
+    reason: Optional[str] = None
+    recommended_action: Optional[str] = None
+    created_at: Optional[str] = None
 
 class EvidenceResponse(BaseModel):
     id: int

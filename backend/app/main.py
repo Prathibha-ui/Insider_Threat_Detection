@@ -345,20 +345,28 @@ def get_incident_detail_endpoint(incident_id: str, db: Session = Depends(get_db)
         },
         "alerts": [
             {
+                "id": a.id,
                 "alert_id": a.AlertId,
                 "title": a.AlertTitle,
-                "category": a.Category,
-                "severity": a.Severity,
-                "timestamp": a.Timestamp.isoformat() if a.Timestamp else None,
-                "device_id": a.DeviceId,
+                "category": a.Category or a.alert_type,
+                "alert_type": a.alert_type or a.Category,
+                "severity": a.severity or a.Severity,
+                "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+                "device_id": a.device_id or a.DeviceId,
                 "account_upn": a.AccountUpn,
-                "ip_address": a.IpAddress,
+                "ip_address": a.ip_address or a.IpAddress,
                 "sha256": a.Sha256,
                 "url": a.Url,
                 "mitre": a.MitreTechniques,
                 "action": a.ActionGrouped,
-                "grade": a.IncidentGrade,
-                "anomaly_score": a.AnomalyScore
+                "grade": a.incident_grade or a.IncidentGrade,
+                "incident_grade": a.incident_grade or a.IncidentGrade,
+                "anomaly_score": a.AnomalyScore,
+                "risk_score": a.risk_score,
+                "threat_level": a.threat_level,
+                "reason": a.reason,
+                "recommended_action": a.recommended_action,
+                "created_at": a.created_at.isoformat() if a.created_at else None
             }
             for a in alerts
         ],

@@ -239,6 +239,14 @@ class MLEngine:
                 alert_count=len(group_alerts)
             )
 
+            # Update each stored alert record in database with generated ML results
+            for a in group_alerts:
+                a.risk_score = assessment.risk_score
+                a.threat_level = assessment.risk_level
+                a.recommended_action = assessment.action
+                reasons_list = [f"{f['factor']}: {f['description']}" for f in assessment.to_dict()['factors']]
+                a.reason = f"ML Detection Risk Score {assessment.risk_score:.1f} ({assessment.risk_level}). " + "; ".join(reasons_list)
+
             # 4. Predict Incident Grade using ML model
             top_alert = group_alerts[0]
             pred_grade, model_conf = self.predict_grade(top_alert)

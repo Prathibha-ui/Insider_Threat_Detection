@@ -1,34 +1,51 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Index
+from sqlalchemy.orm import synonym
 from app.db.database import Base
 
 class Alert(Base):
     __tablename__ = "alerts"
 
+    # Requested schema columns
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    AlertId = Column(String(100), unique=True, index=True, nullable=False)
+    device_id = Column(String(100), index=True, nullable=True)
+    ip_address = Column(String(100), index=True, nullable=True)
+    alert_type = Column(String(100), index=True, nullable=True)
+    severity = Column(String(50), default="Medium", index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    incident_grade = Column(String(50), nullable=True, default="TruePositive", index=True)
+    risk_score = Column(Float, default=0.0)
+    threat_level = Column(String(50), nullable=True, default="Medium")
+    reason = Column(Text, nullable=True)
+    recommended_action = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Legacy & GUIDE benchmark columns for full backwards compatibility
+    AlertId = Column(String(100), unique=True, index=True, nullable=True)
     IncidentId = Column(String(100), index=True, nullable=True)
     OrgId = Column(String(100), nullable=True, default="ORG-CORP-01")
-    Timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     DetectorId = Column(String(100), nullable=True)
-    AlertTitle = Column(String(255), nullable=False, index=True)
-    Category = Column(String(100), nullable=False, index=True)
+    AlertTitle = Column(String(255), nullable=True, index=True)
     MitreTechniques = Column(String(255), nullable=True)
-    Severity = Column(String(50), default="Medium", index=True)
-    IncidentGrade = Column(String(50), nullable=True, default="TruePositive", index=True) # Ground truth
     ActionGrouped = Column(String(50), nullable=True, default="Detected")
-    DeviceId = Column(String(100), index=True, nullable=True)
     AccountUpn = Column(String(150), index=True, nullable=True)
-    IpAddress = Column(String(100), index=True, nullable=True)
     Sha256 = Column(String(100), nullable=True)
     Url = Column(String(500), nullable=True)
     AnomalyScore = Column(Float, default=0.0)
     ClusterId = Column(String(100), index=True, nullable=True)
     RawPayload = Column(Text, nullable=True)
 
+    # Synonyms mapping legacy names to new columns
+    DeviceId = synonym("device_id")
+    IpAddress = synonym("ip_address")
+    Category = synonym("alert_type")
+    Severity = synonym("severity")
+    Timestamp = synonym("timestamp")
+    IncidentGrade = synonym("incident_grade")
+
     __table_args__ = (
-        Index("idx_alert_device_ts", "DeviceId", "Timestamp"),
-        Index("idx_alert_account_ts", "AccountUpn", "Timestamp"),
+        Index("idx_alert_device_ts", "device_id", "timestamp"),
+        Index("idx_alert_account_ts", "AccountUpn", "timestamp"),
     )
 
 class Incident(Base):

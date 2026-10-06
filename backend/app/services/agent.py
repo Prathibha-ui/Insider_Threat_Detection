@@ -508,6 +508,14 @@ def investigate_incident(incident: Incident, alerts: List[Alert], db: Session) -
     if final_state["risk_breakdown"]:
         incident.RiskBreakdown = json.dumps(final_state["risk_breakdown"])
 
+    # Update Alert database records with agent investigation results
+    for a in alerts:
+        a.risk_score = final_state["risk_score"]
+        a.threat_level = final_state["risk_level"]
+        a.recommended_action = final_state["recommended_action"]
+        reason_steps = [f"{s.get('name')}: {s.get('observation')}" for s in final_state.get("reasoning", [])[:3]]
+        a.reason = f"Agent Investigation Verdict: {final_state['recommended_action']}. Summary: {final_state['summary']}. Observations: " + "; ".join(reason_steps)
+
     db.bulk_save_objects(db_evidence)
     db.bulk_save_objects(db_logs)
     db.commit()

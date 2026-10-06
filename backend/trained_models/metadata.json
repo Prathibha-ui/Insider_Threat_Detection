@@ -1,7 +1,7 @@
 {
   "framework": "scikit-learn",
-  "sklearn_version": "1.5.1",
-  "train_timestamp": "2026-10-02T06:15:52.216384Z",
+  "sklearn_version": "1.9.1",
+  "train_timestamp": "2026-10-06T18:44:20.095618Z",
   "random_seed": 5,
   "split_method": "GroupShuffleSplit(n_splits=1, test_size=0.25, random_state=5)",
   "group_column": "IncidentId",
@@ -29,13 +29,13 @@
   },
   "evaluation_metrics": {
     "grade_classification": {
-      "accuracy": 0.8438,
-      "macro_f1": 0.8439,
+      "accuracy": 0.75,
+      "macro_f1": 0.7537,
       "per_class": {
         "TruePositive": {
-          "precision": 1.0,
+          "precision": 0.7,
           "recall": 0.875,
-          "f1": 0.9333,
+          "f1": 0.7778,
           "support": 8
         },
         "BenignPositive": {
@@ -45,9 +45,9 @@
           "support": 10
         },
         "FalsePositive": {
-          "precision": 0.7368,
-          "recall": 1.0,
-          "f1": 0.8485,
+          "precision": 0.6875,
+          "recall": 0.7857,
+          "f1": 0.7333,
           "support": 14
         }
       },
@@ -63,9 +63,9 @@
           4
         ],
         [
+          3,
           0,
-          0,
-          14
+          11
         ]
       ],
       "labels": [
