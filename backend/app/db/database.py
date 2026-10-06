@@ -10,6 +10,8 @@ engine_kwargs = {}
 
 if db_url.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif "postgresql" in db_url:
+    engine_kwargs["connect_args"] = {"prepare_threshold": None}
 
 engine = create_engine(db_url, **engine_kwargs)
 
