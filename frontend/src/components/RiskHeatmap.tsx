@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { Flame, ShieldAlert, Sparkles, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Flame, ShieldAlert, Laptop, AlertOctagon, AlertTriangle, ShieldCheck, X, Filter } from 'lucide-react';
 import { Incident } from '../types';
 
 interface Props {
@@ -9,106 +9,81 @@ interface Props {
 }
 
 export const RiskHeatmap: React.FC<Props> = ({ incidents, selectedFilter, onSelectFilter }) => {
-  // Severity levels (rows)
-  const severities = ['Critical', 'High', 'Medium', 'Low'];
-  // Impact levels (columns)
-  const impactLevels = [
-    { key: 'Multi-Host', label: 'Multi-Host / Core' },
-    { key: 'Single-Host', label: 'Single Host' },
-    { key: 'Perimeter-Noise', label: 'Perimeter / Noise' }
-  ];
+  const [viewType, setViewType] = useState<'threats' | 'devices'>('threats');
 
-  // Helper to categorize incident blast radius
-  const getImpactCategory = (inc: Incident) => {
-    const devices = inc.entity_summary?.devices || [];
-    const accounts = inc.entity_summary?.accounts || [];
-    if (devices.length > 1 || accounts.length > 2) return 'Multi-Host';
-    if (devices.length === 1 || accounts.length === 1) return 'Single-Host';
-    return 'Perimeter-Noise';
-  };
+  // Red – High Risk (> 70)
+  const highRiskIncidents = incidents.filter((i) => i.risk_score >= 70.0);
+  // Orange – Medium Risk (40 - 70)
+  const mediumRiskIncidents = incidents.filter((i) => i.risk_score >= 40.0 && i.risk_score < 70.0);
+  // Yellow – Low Risk (< 40)
+  const lowRiskIncidents = incidents.filter((i) => i.risk_score < 40.0);
 
-  // Build matrix counts
-  const matrix: Record<string, Record<string, Incident[]>> = {};
-  severities.forEach((sev) => {
-    matrix[sev] = {};
-    impactLevels.forEach((imp) => {
-      matrix[sev][imp.key] = [];
+  // Group devices by highest risk score
+  const deviceRiskMap: Record<string, { maxRisk: number; incidents: Incident[] }> = {};
+  incidents.forEach((inc) => {
+    const devs = inc.entity_summary?.devices || [];
+    devs.forEach((d) => {
+      if (!deviceRiskMap[d]) {
+        deviceRiskMap[d] = { maxRisk: inc.risk_score, incidents: [inc] };
+      } else {
+        deviceRiskMap[d].maxRisk = Math.max(deviceRiskMap[d].maxRisk, inc.risk_score);
+        deviceRiskMap[d].incidents.push(inc);
+      }
     });
   });
 
-  incidents.forEach((inc) => {
-    const sev = inc.severity || 'Medium';
-    const imp = getImpactCategory(inc);
-    if (matrix[sev] && matrix[sev][imp]) {
-      matrix[sev][imp].push(inc);
-    }
-  });
-
-  // Severity stats
-  const criticalCount = incidents.filter(i => i.severity === 'Critical').length;
-  const highCount = incidents.filter(i => i.severity === 'High').length;
-  const medCount = incidents.filter(i => i.severity === 'Medium').length;
-  const lowCount = incidents.filter(i => i.severity === 'Low').length;
-
-  const getCellColor = (sev: string, count: number, isSelected: boolean) => {
-    if (count === 0) return 'bg-slate-900/40 text-slate-600 border-slate-800/60 hover:bg-slate-800/40';
-    
-    if (sev === 'Critical') {
-      return isSelected 
-        ? 'bg-rose-500 text-white border-rose-400 ring-2 ring-rose-400 shadow-lg shadow-rose-500/30'
-        : 'bg-rose-950/60 text-rose-300 border-rose-700/50 hover:bg-rose-900/80 hover:border-rose-500';
-    }
-    if (sev === 'High') {
-      return isSelected
-        ? 'bg-amber-500 text-slate-950 border-amber-400 ring-2 ring-amber-400 shadow-lg shadow-amber-500/30'
-        : 'bg-amber-950/50 text-amber-300 border-amber-700/40 hover:bg-amber-900/70 hover:border-amber-500';
-    }
-    if (sev === 'Medium') {
-      return isSelected
-        ? 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400 shadow-lg shadow-blue-500/30'
-        : 'bg-blue-950/40 text-blue-300 border-blue-800/40 hover:bg-blue-900/60 hover:border-blue-500';
-    }
-    return isSelected
-      ? 'bg-emerald-600 text-white border-emerald-400 ring-2 ring-emerald-400'
-      : 'bg-emerald-950/30 text-emerald-300 border-emerald-800/30 hover:bg-emerald-900/50 hover:border-emerald-500';
-  };
+  const highRiskDevices = Object.entries(deviceRiskMap).filter(([_, v]) => v.maxRisk >= 70.0);
+  const medRiskDevices = Object.entries(deviceRiskMap).filter(([_, v]) => v.maxRisk >= 40.0 && v.maxRisk < 70.0);
+  const lowRiskDevices = Object.entries(deviceRiskMap).filter(([_, v]) => v.maxRisk < 40.0);
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-4 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-border/80">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+    <div className="bg-surface rounded-xl border border-border p-4 shadow-sm space-y-3">
+      {/* Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/80">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
             <Flame className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              Risk Heat Map (Threat vs Impact)
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
+              5. Security Risk Heatmap (High • Medium • Low)
             </h3>
-            <p className="text-[11px] text-slate-400">Click any matrix cell to filter priority queue</p>
+            <p className="text-[11px] text-slate-400">
+              Interactive visualization displaying threats and endpoint devices arranged by risk severity level
+            </p>
           </div>
         </div>
 
-        {/* Quick Severity Badges */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] px-2 py-0.5 rounded font-mono font-medium bg-rose-500/10 text-rose-400 border border-rose-500/30">
-            {criticalCount} Critical
-          </span>
-          <span className="text-[10px] px-2 py-0.5 rounded font-mono font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            {highCount} High
-          </span>
-          <span className="text-[10px] px-2 py-0.5 rounded font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/30">
-            {medCount} Med
-          </span>
-          <span className="text-[10px] px-2 py-0.5 rounded font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            {lowCount} Low
-          </span>
+        {/* View Switcher: Threats vs Devices */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-slate-950/80 rounded-lg p-0.5 border border-border text-xs">
+            <button
+              onClick={() => setViewType('threats')}
+              className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 ${
+                viewType === 'threats'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" /> Threat Incidents ({incidents.length})
+            </button>
+            <button
+              onClick={() => setViewType('devices')}
+              className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 ${
+                viewType === 'devices'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Laptop className="w-3.5 h-3.5" /> Endpoint Devices ({Object.keys(deviceRiskMap).length})
+            </button>
+          </div>
 
           {selectedFilter && (
             <button
               onClick={() => onSelectFilter(null)}
-              className="ml-2 flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-              title="Clear Heat Map Filter"
+              className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition"
+              title="Reset Filter"
             >
               <X className="w-3 h-3" /> Clear Filter
             </button>
@@ -116,57 +91,175 @@ export const RiskHeatmap: React.FC<Props> = ({ incidents, selectedFilter, onSele
         </div>
       </div>
 
-      {/* 2D Heat Grid */}
-      <div className="mt-3 grid grid-cols-[80px_repeat(3,1fr)] gap-2 items-center text-xs">
-        {/* Column Headers */}
-        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Severity</div>
-        {impactLevels.map((imp) => (
-          <div key={imp.key} className="text-center text-[10px] uppercase tracking-wider text-slate-400 font-medium truncate">
-            {imp.label}
-          </div>
-        ))}
-
-        {/* Rows */}
-        {severities.map((sev) => (
-          <React.Fragment key={sev}>
-            <div className="flex items-center gap-1.5 font-medium text-slate-300 text-[11px]">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  sev === 'Critical'
-                    ? 'bg-rose-500 ring-2 ring-rose-500/30'
-                    : sev === 'High'
-                    ? 'bg-amber-500'
-                    : sev === 'Medium'
-                    ? 'bg-blue-500'
-                    : 'bg-emerald-500'
-                }`}
-              />
-              {sev}
+      {/* 3 Color-Coded Risk Heatmap Cards: Red, Orange, Yellow */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {/* 1. RED - High Risk */}
+        <div
+          onClick={() => onSelectFilter(selectedFilter === 'HighRisk' ? null : 'HighRisk')}
+          className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
+            selectedFilter === 'HighRisk'
+              ? 'bg-rose-950/90 border-rose-400 ring-2 ring-rose-400 shadow-lg shadow-rose-950/50'
+              : 'bg-gradient-to-b from-rose-950/40 to-slate-900/60 border-rose-500/30 hover:border-rose-400 hover:bg-rose-950/50'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50 animate-pulse" />
+              <span className="text-xs font-extrabold uppercase tracking-wide text-rose-300">
+                Red – High Risk (Score &gt; 70)
+              </span>
             </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              CRITICAL
+            </span>
+          </div>
 
-            {impactLevels.map((imp) => {
-              const cellKey = `${sev}:${imp.key}`;
-              const count = matrix[sev][imp.key].length;
-              const isSelected = selectedFilter === cellKey;
+          <div className="flex items-baseline gap-2 my-2">
+            <span className="text-3xl font-black font-mono text-rose-200">
+              {viewType === 'threats' ? highRiskIncidents.length : highRiskDevices.length}
+            </span>
+            <span className="text-xs text-rose-300/80">
+              {viewType === 'threats' ? 'Critical threats detected' : 'Compromised devices'}
+            </span>
+          </div>
 
-              return (
-                <button
-                  key={imp.key}
-                  disabled={count === 0}
-                  onClick={() => onSelectFilter(isSelected ? null : cellKey)}
-                  className={`h-9 rounded-lg border flex items-center justify-between px-3 transition-all duration-150 ${getCellColor(
-                    sev,
-                    count,
-                    isSelected
-                  )} ${count === 0 ? 'cursor-default' : 'cursor-pointer'}`}
-                >
-                  <span className="text-[11px] font-medium opacity-80">{imp.key}</span>
-                  <span className="font-mono font-bold text-xs">{count}</span>
-                </button>
-              );
-            })}
-          </React.Fragment>
-        ))}
+          <div className="mt-3 pt-2.5 border-t border-rose-900/50 text-[11px] text-slate-300 space-y-1">
+            <div className="font-semibold text-rose-400 text-[10px] uppercase tracking-wider">
+              {viewType === 'threats' ? 'Top High-Risk Alerts:' : 'Top High-Risk Devices:'}
+            </div>
+            {viewType === 'threats' ? (
+              <div className="space-y-1">
+                {highRiskIncidents.slice(0, 3).map((inc) => (
+                  <div key={inc.incident_id} className="truncate flex items-center justify-between text-[11px]">
+                    <span className="truncate text-slate-200">{inc.title}</span>
+                    <span className="font-mono text-rose-400 font-bold ml-2 shrink-0">{inc.risk_score.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {highRiskDevices.slice(0, 3).map(([d, v]) => (
+                  <div key={d} className="truncate flex items-center justify-between text-[11px]">
+                    <span className="truncate font-mono text-slate-200">{d}</span>
+                    <span className="font-mono text-rose-400 font-bold ml-2 shrink-0">Risk {v.maxRisk.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. ORANGE - Medium Risk */}
+        <div
+          onClick={() => onSelectFilter(selectedFilter === 'MediumRisk' ? null : 'MediumRisk')}
+          className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
+            selectedFilter === 'MediumRisk'
+              ? 'bg-amber-950/90 border-amber-400 ring-2 ring-amber-400 shadow-lg shadow-amber-950/50'
+              : 'bg-gradient-to-b from-amber-950/30 to-slate-900/60 border-amber-500/30 hover:border-amber-400 hover:bg-amber-950/40'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
+              <span className="text-xs font-extrabold uppercase tracking-wide text-amber-300">
+                Orange – Medium Risk (Score 40 - 70)
+              </span>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              ELEVATED
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2 my-2">
+            <span className="text-3xl font-black font-mono text-amber-200">
+              {viewType === 'threats' ? mediumRiskIncidents.length : medRiskDevices.length}
+            </span>
+            <span className="text-xs text-amber-300/80">
+              {viewType === 'threats' ? 'Medium-risk threats' : 'Monitored devices'}
+            </span>
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-amber-900/50 text-[11px] text-slate-300 space-y-1">
+            <div className="font-semibold text-amber-400 text-[10px] uppercase tracking-wider">
+              {viewType === 'threats' ? 'Sample Medium Threats:' : 'Sample Devices:'}
+            </div>
+            {viewType === 'threats' ? (
+              <div className="space-y-1">
+                {mediumRiskIncidents.slice(0, 3).map((inc) => (
+                  <div key={inc.incident_id} className="truncate flex items-center justify-between text-[11px]">
+                    <span className="truncate text-slate-200">{inc.title}</span>
+                    <span className="font-mono text-amber-400 font-bold ml-2 shrink-0">{inc.risk_score.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {medRiskDevices.slice(0, 3).map(([d, v]) => (
+                  <div key={d} className="truncate flex items-center justify-between text-[11px]">
+                    <span className="truncate font-mono text-slate-200">{d}</span>
+                    <span className="font-mono text-amber-400 font-bold ml-2 shrink-0">Risk {v.maxRisk.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. YELLOW - Low Risk */}
+        <div
+          onClick={() => onSelectFilter(selectedFilter === 'LowRisk' ? null : 'LowRisk')}
+          className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
+            selectedFilter === 'LowRisk'
+              ? 'bg-yellow-950/90 border-yellow-400 ring-2 ring-yellow-400 shadow-lg shadow-yellow-950/50'
+              : 'bg-gradient-to-b from-yellow-950/20 to-slate-900/60 border-yellow-500/30 hover:border-yellow-400 hover:bg-yellow-950/30'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-yellow-400 shadow-sm shadow-yellow-400/50" />
+              <span className="text-xs font-extrabold uppercase tracking-wide text-yellow-300">
+                Yellow – Low Risk (Score &lt; 40)
+              </span>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+              ROUTINE / NOISE
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2 my-2">
+            <span className="text-3xl font-black font-mono text-yellow-200">
+              {viewType === 'threats' ? lowRiskIncidents.length : lowRiskDevices.length}
+            </span>
+            <span className="text-xs text-yellow-300/80">
+              {viewType === 'threats' ? 'Low risk & benign signals' : 'Baseline normal devices'}
+            </span>
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-yellow-900/50 text-[11px] text-slate-300 space-y-1">
+            <div className="font-semibold text-yellow-400 text-[10px] uppercase tracking-wider">
+              {viewType === 'threats' ? 'Auto-Suppressed Noise:' : 'Baseline Devices:'}
+            </div>
+            {viewType === 'threats' ? (
+              <div className="space-y-1">
+                {lowRiskIncidents.slice(0, 3).map((inc) => (
+                  <div key={inc.incident_id} className="truncate flex items-center justify-between text-[11px]">
+                    <span className="truncate text-slate-200">{inc.title}</span>
+                    <span className="font-mono text-yellow-400 font-bold ml-2 shrink-0">{inc.risk_score.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {lowRiskDevices.slice(0, 3).map(([d, v]) => (
+                  <div key={d} className="truncate flex items-center justify-between text-[11px]">
+                    <span className="truncate font-mono text-slate-200">{d}</span>
+                    <span className="font-mono text-yellow-400 font-bold ml-2 shrink-0">Risk {v.maxRisk.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

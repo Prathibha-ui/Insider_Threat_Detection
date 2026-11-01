@@ -9,7 +9,12 @@ import {
   Server, 
   User, 
   ChevronRight,
-  TrendingUp,
+  TrendingDown,
+  Clock,
+  Usb,
+  HardDriveDownload,
+  KeyRound,
+  ShieldAlert,
   ArrowUpDown
 } from 'lucide-react';
 import { Incident } from '../types';
@@ -28,29 +33,23 @@ export const PriorityQueue: React.FC<Props> = ({
   heatmapFilter
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [tierFilter, setTierFilter] = useState<'All' | 'HighRisk' | 'MediumRisk' | 'LowRisk'>('All');
   const [actionFilter, setActionFilter] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<'risk' | 'alerts' | 'recent'>('risk');
 
-  // Filter incidents based on heat map, action filter, and search text
+  // Filter alerts / incidents
   const filteredIncidents = incidents.filter((inc) => {
-    // Heatmap filter check: format "Severity:Impact"
-    if (heatmapFilter) {
-      const [sev, imp] = heatmapFilter.split(':');
-      if (inc.severity !== sev) return false;
-      const devices = inc.entity_summary?.devices || [];
-      const accounts = inc.entity_summary?.accounts || [];
-      let incImp = 'Perimeter-Noise';
-      if (devices.length > 1 || accounts.length > 2) incImp = 'Multi-Host';
-      else if (devices.length === 1 || accounts.length === 1) incImp = 'Single-Host';
-      if (incImp !== imp) return false;
-    }
+    // 1. Heatmap Filter (from Risk Heatmap click)
+    const activeTier = heatmapFilter || (tierFilter !== 'All' ? tierFilter : null);
+    if (activeTier === 'HighRisk' && inc.risk_score < 70.0) return false;
+    if (activeTier === 'MediumRisk' && (inc.risk_score < 40.0 || inc.risk_score >= 70.0)) return false;
+    if (activeTier === 'LowRisk' && inc.risk_score >= 40.0) return false;
 
-    // Action filter
+    // 2. Action filter
     if (actionFilter !== 'All' && inc.agent_action !== actionFilter) {
       return false;
     }
 
-    // Search query
+    // 3. Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchId = inc.incident_id.toLowerCase().includes(q);
@@ -63,191 +62,190 @@ export const PriorityQueue: React.FC<Props> = ({
     return true;
   });
 
-  // Sort incidents
-  const sortedIncidents = [...filteredIncidents].sort((a, b) => {
-    if (sortBy === 'risk') return b.risk_score - a.risk_score;
-    if (sortBy === 'alerts') return b.alert_count - a.alert_count;
-    if (sortBy === 'recent') {
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeB - timeA;
-    }
-    return 0;
-  });
+  // Always arrange from HIGHEST to LOWEST risk score as specified
+  const sortedIncidents = [...filteredIncidents].sort((a, b) => b.risk_score - a.risk_score);
 
-  const getActionBadge = (action: string) => {
-    switch (action) {
-      case 'Escalate':
-        return (
-          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">
-            <AlertOctagon className="w-3 h-3" /> ESCALATE
-          </span>
-        );
-      case 'Group':
-        return (
-          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
-            <GitMerge className="w-3 h-3" /> GROUP
-          </span>
-        );
-      case 'Suppress':
-        return (
-          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-700/40 text-slate-400 border border-slate-700">
-            <ShieldOff className="w-3 h-3" /> SUPPRESSED
-          </span>
-        );
-      default:
-        return (
-          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-            <Eye className="w-3 h-3" /> REVIEW
-          </span>
-        );
+  const getRiskPill = (score: number) => {
+    if (score >= 70.0) {
+      return (
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+          {score.toFixed(1)} HIGH
+        </span>
+      );
     }
+    if (score >= 40.0) {
+      return (
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          {score.toFixed(1)} MED
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+        <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+        {score.toFixed(1)} LOW
+      </span>
+    );
   };
 
-  const getRiskBarColor = (score: number) => {
-    if (score >= 80) return 'bg-rose-500 shadow-sm shadow-rose-500/50';
-    if (score >= 60) return 'bg-amber-500 shadow-sm shadow-amber-500/50';
-    if (score >= 40) return 'bg-blue-500';
-    return 'bg-emerald-500';
+  const getThreatIcon = (title: string) => {
+    const t = title.toLowerCase();
+    if (t.includes('usb') || t.includes('removable')) {
+      return <Usb className="w-4 h-4 text-rose-400" />;
+    }
+    if (t.includes('bulk') || t.includes('transfer') || t.includes('exfiltration')) {
+      return <HardDriveDownload className="w-4 h-4 text-rose-400" />;
+    }
+    if (t.includes('login') || t.includes('logon') || t.includes('credential') || t.includes('off-hours')) {
+      return <KeyRound className="w-4 h-4 text-amber-400" />;
+    }
+    return <ShieldAlert className="w-4 h-4 text-blue-400" />;
+  };
+
+  const formatTiming = (isoString: string | null) => {
+    if (!isoString) return 'Just now';
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    } catch {
+      return 'Recent';
+    }
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
-      {/* Header & Controls */}
-      <div className="p-3.5 border-b border-border space-y-2.5">
+    <div className="bg-surface rounded-xl border border-border h-full flex flex-col overflow-hidden shadow-sm">
+      {/* Header Bar */}
+      <div className="p-3.5 border-b border-border/80 space-y-2.5 bg-slate-900/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              Analyst Priority Queue ({sortedIncidents.length})
+            <TrendingDown className="w-4 h-4 text-rose-400" />
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-100">
+              6. Security Alert List (Ranked Highest &rarr; Lowest Risk)
             </h2>
           </div>
-
-          {/* Sort Selector */}
-          <div className="flex items-center gap-1 text-[11px] text-slate-400">
-            <ArrowUpDown className="w-3 h-3" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-slate-900 border border-border rounded px-1.5 py-0.5 text-slate-300 focus:outline-none focus:border-blue-500 text-[11px]"
-            >
-              <option value="risk">Risk Score</option>
-              <option value="alerts">Alert Count</option>
-              <option value="recent">Recent</option>
-            </select>
-          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+            {sortedIncidents.length} of {incidents.length} Alerts
+          </span>
         </div>
 
-        {/* Search */}
+        {/* Search Input */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500" />
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by ID, title, host, user..."
+            placeholder="Search by threat title, device, or user..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-900/90 border border-border rounded-lg text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition"
+            className="w-full bg-slate-950 border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 text-xs">
-          {['All', 'Escalate', 'Group', 'Request Review', 'Suppress'].map((f) => (
+        {/* Risk Level Tiers & Filters */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+          <div className="flex items-center gap-1 bg-slate-950/80 rounded-lg p-0.5 border border-border">
             <button
-              key={f}
-              onClick={() => setActionFilter(f)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition whitespace-nowrap ${
-                actionFilter === f
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              onClick={() => setTierFilter('All')}
+              className={`px-2 py-0.5 rounded font-medium transition ${
+                tierFilter === 'All' && !heatmapFilter ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {f}
+              All
             </button>
-          ))}
+            <button
+              onClick={() => setTierFilter('HighRisk')}
+              className={`px-2 py-0.5 rounded font-medium transition ${
+                (tierFilter === 'HighRisk' || heatmapFilter === 'HighRisk') ? 'bg-rose-600 text-white font-bold' : 'text-rose-400 hover:text-rose-200'
+              }`}
+            >
+              🔴 High Risk (&gt;70)
+            </button>
+            <button
+              onClick={() => setTierFilter('MediumRisk')}
+              className={`px-2 py-0.5 rounded font-medium transition ${
+                (tierFilter === 'MediumRisk' || heatmapFilter === 'MediumRisk') ? 'bg-amber-600 text-white font-bold' : 'text-amber-400 hover:text-amber-200'
+              }`}
+            >
+              🟠 Med (40-70)
+            </button>
+            <button
+              onClick={() => setTierFilter('LowRisk')}
+              className={`px-2 py-0.5 rounded font-medium transition ${
+                (tierFilter === 'LowRisk' || heatmapFilter === 'LowRisk') ? 'bg-yellow-600 text-white font-bold' : 'text-yellow-400 hover:text-yellow-200'
+              }`}
+            >
+              🟡 Low (&lt;40)
+            </button>
+          </div>
+
+          <span className="text-[10px] text-slate-400 italic">
+            Top threats investigated first
+          </span>
         </div>
       </div>
 
-      {/* Incident List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-border/60 p-1.5 space-y-1">
+      {/* Ranked Alerts List Body */}
+      <div className="flex-1 overflow-y-auto divide-y divide-border/60">
         {sortedIncidents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full py-12 px-4 text-center">
-            <div className="p-3 rounded-full bg-slate-900 border border-slate-800 text-slate-500 mb-3">
-              <Layers className="w-6 h-6 text-slate-500" />
-            </div>
-            <h4 className="text-xs font-semibold text-slate-300">No Active Incidents</h4>
-            <p className="text-[11px] text-slate-500 mt-1 max-w-[220px]">
-              {incidents.length === 0
-                ? 'Ingest an alert using the form above or pick a scenario preset to run autonomous triage.'
-                : 'No incidents match your current search or filter.'}
-            </p>
+          <div className="py-12 text-center text-slate-500 text-xs">
+            No alerts match the active risk filter.
           </div>
         ) : (
           sortedIncidents.map((inc) => {
-            const isSelected = selectedIncidentId === inc.incident_id;
-            const accounts = inc.entity_summary?.accounts || [];
+            const isSelected = inc.incident_id === selectedIncidentId;
             const devices = inc.entity_summary?.devices || [];
+            const accounts = inc.entity_summary?.accounts || [];
 
             return (
               <div
                 key={inc.incident_id}
                 onClick={() => onSelectIncident(inc.incident_id)}
-                className={`p-3 rounded-lg cursor-pointer transition-all duration-150 relative border ${
+                className={`p-3 cursor-pointer transition-all duration-150 flex items-start gap-3 relative ${
                   isSelected
-                    ? 'bg-slate-800/90 border-blue-500/80 shadow-md shadow-blue-500/10 ring-1 ring-blue-500/50'
-                    : 'bg-surface hover:bg-slate-800/40 border-transparent hover:border-border'
+                    ? 'bg-blue-950/40 border-l-4 border-l-blue-500'
+                    : 'hover:bg-slate-800/30'
                 }`}
               >
-                {/* Top bar: ID, Alert Count, Action Badge */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs font-bold text-slate-200">
-                      {inc.incident_id}
+                {/* Threat Icon */}
+                <div className="mt-0.5 p-1.5 rounded-lg bg-slate-900 border border-border shrink-0">
+                  {getThreatIcon(inc.title)}
+                </div>
+
+                {/* Main Content */}
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-xs text-slate-100 truncate">
+                      {inc.title}
                     </span>
-                    <span className="flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                      <Layers className="w-2.5 h-2.5" /> {inc.alert_count} alerts
+                    {getRiskPill(inc.risk_score)}
+                  </div>
+
+                  {/* Device and User Details */}
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1 font-mono text-slate-300">
+                      <Server className="w-3 h-3 text-blue-400" />
+                      {devices[0] || 'DEV-FLEET'}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 font-mono text-slate-400 truncate max-w-[120px]">
+                      <User className="w-3 h-3 text-purple-400" />
+                      {accounts[0] || 'system'}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <Clock className="w-3 h-3" />
+                      {formatTiming(inc.created_at)}
                     </span>
                   </div>
-                  {getActionBadge(inc.agent_action)}
+
+                  {/* Incident Summary snippet */}
+                  <p className="text-[11px] text-slate-400 line-clamp-1">
+                    {inc.summary || 'Correlated security threat under autonomous investigation.'}
+                  </p>
                 </div>
 
-                {/* Title */}
-                <h4 className="mt-1.5 text-xs font-semibold text-slate-100 line-clamp-1">
-                  {inc.title}
-                </h4>
-
-                {/* Risk Score Meter */}
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[11px] font-mono font-bold text-slate-300 w-9">
-                    {inc.risk_score.toFixed(0)}
-                    <span className="text-[9px] text-slate-500">/100</span>
-                  </span>
-                  <div className="flex-1 h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${getRiskBarColor(inc.risk_score)}`}
-                      style={{ width: `${Math.min(100, Math.max(5, inc.risk_score))}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">
-                    {inc.severity}
-                  </span>
-                </div>
-
-                {/* Affected Entities */}
-                <div className="mt-2.5 flex items-center gap-2 text-[10px] text-slate-400 overflow-hidden truncate">
-                  {devices.length > 0 && (
-                    <span className="flex items-center gap-1 truncate bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/60">
-                      <Server className="w-2.5 h-2.5 text-indigo-400" />
-                      {devices[0]} {devices.length > 1 ? `+${devices.length - 1}` : ''}
-                    </span>
-                  )}
-                  {accounts.length > 0 && (
-                    <span className="flex items-center gap-1 truncate bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/60">
-                      <User className="w-2.5 h-2.5 text-blue-400" />
-                      {accounts[0].split('\\').pop()}
-                    </span>
-                  )}
-                </div>
+                <ChevronRight className={`w-4 h-4 shrink-0 mt-2 transition ${isSelected ? 'text-blue-400' : 'text-slate-600'}`} />
               </div>
             );
           })

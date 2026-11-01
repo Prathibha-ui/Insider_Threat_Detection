@@ -106,4 +106,19 @@ class AnalystFeedback(Base):
     Comments = Column(Text, nullable=True)
     SubmittedAt = Column(DateTime, default=datetime.utcnow)
 
-__all__ = ["Alert", "Incident", "Evidence", "AgentReasoningLog", "AnalystFeedback"]
+class EndpointDevice(Base):
+    __tablename__ = "endpoint_devices"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    device_id = Column(String(100), unique=True, index=True, nullable=False)
+    hostname = Column(String(150), nullable=True)
+    ip_address = Column(String(100), nullable=True)
+    os = Column(String(50), default="Windows 11 Enterprise")
+    department = Column(String(100), default="General Corporate")
+    status = Column(String(50), default="Online", index=True)  # Online, Offline, Isolated
+    risk_score = Column(Float, default=0.0)
+    last_seen = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+__all__ = ["Alert", "Incident", "Evidence", "AgentReasoningLog", "AnalystFeedback", "EndpointDevice"]
+

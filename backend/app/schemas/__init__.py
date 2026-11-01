@@ -184,6 +184,12 @@ class IncidentDetailResponse(BaseModel):
 class MetricsResponse(BaseModel):
     model_config = {"protected_namespaces": ()}
 
+    # 4 Primary Endpoint & Incident Metrics requested by administrator
+    total_endpoints: int = 0
+    online_endpoints: int = 0
+    high_risk_devices: int = 0
+    active_incidents: int = 0
+
     total_alerts: int
     total_incidents: int
     escalated_count: int
@@ -208,3 +214,24 @@ class RawAlertItem(BaseModel):
 class ComparisonResponse(BaseModel):
     raw_alerts: Dict[str, Any]
     socpilot_ai: Dict[str, Any]
+
+class EndpointDeviceCreate(BaseModel):
+    device_id: str
+    hostname: Optional[str] = None
+    ip_address: Optional[str] = "10.0.0.1"
+    os: Optional[str] = "Windows 11 Enterprise"
+    department: Optional[str] = "General Corporate"
+    status: Optional[str] = "Online"
+
+class EndpointDeviceResponse(BaseModel):
+    id: int
+    device_id: str
+    hostname: Optional[str] = None
+    ip_address: Optional[str] = None
+    os: str
+    department: str
+    status: str
+    risk_score: float
+    last_seen: Optional[str] = None
+    created_at: Optional[str] = None
+    alert_count: int = 0

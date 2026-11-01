@@ -1,18 +1,26 @@
-﻿export interface Alert {
+export interface Alert {
+  id?: number;
   alert_id: string;
   title: string;
   category: string;
+  alert_type?: string;
   severity: string;
   timestamp: string | null;
   device_id: string;
   account_upn: string;
   ip_address: string;
-  sha256: string;
-  url: string;
-  mitre: string;
-  action: string;
-  grade: string;
+  sha256?: string;
+  url?: string;
+  mitre?: string;
+  action?: string;
+  grade?: string;
+  incident_grade?: string;
   anomaly_score: number;
+  risk_score?: number;
+  threat_level?: string;
+  reason?: string;
+  recommended_action?: string;
+  created_at?: string | null;
 }
 
 export interface EntitySummary {
@@ -20,6 +28,20 @@ export interface EntitySummary {
   devices?: string[];
   ips?: string[];
   total_alerts?: number;
+}
+
+export interface FactorContribution {
+  factor: string;
+  weight: number;
+  score: number;
+  description: string;
+}
+
+export interface RiskBreakdown {
+  risk_score: number;
+  risk_level: string;
+  action?: string;
+  factors: FactorContribution[];
 }
 
 export interface Incident {
@@ -35,6 +57,7 @@ export interface Incident {
   alert_count: number;
   mitre_tactics: string[];
   entity_summary: EntitySummary;
+  risk_breakdown?: RiskBreakdown;
   graph_density: number;
   anomaly_score: number;
   created_at: string | null;
@@ -105,6 +128,12 @@ export interface IncidentDetailResponse {
 }
 
 export interface Metrics {
+  // 4 Primary Endpoint & Incident Metrics
+  total_endpoints: number;
+  online_endpoints: number;
+  high_risk_devices: number;
+  active_incidents: number;
+
   total_alerts: number;
   total_incidents: number;
   escalated_count: number;
@@ -114,6 +143,20 @@ export interface Metrics {
   workload_reduction_pct: number;
   tp_preservation_pct: number;
   estimated_hours_saved: number;
+}
+
+export interface EndpointDevice {
+  id: number;
+  device_id: string;
+  hostname: string;
+  ip_address: string;
+  os: string;
+  department: string;
+  status: 'Online' | 'Offline' | 'Isolated';
+  risk_score: number;
+  last_seen: string | null;
+  created_at: string | null;
+  alert_count?: number;
 }
 
 export interface RawAlertItem {

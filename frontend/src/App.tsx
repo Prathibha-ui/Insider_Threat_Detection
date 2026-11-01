@@ -8,7 +8,7 @@ import {
   SlidersHorizontal, 
   Sparkles,
   Layers,
-  Columns
+  Columns, Server
 } from 'lucide-react';
 
 import { MetricsOverview } from './components/MetricsOverview';
@@ -16,6 +16,7 @@ import { RiskHeatmap } from './components/RiskHeatmap';
 import { PriorityQueue } from './components/PriorityQueue';
 import { IncidentDetail } from './components/IncidentDetail';
 import { ComparisonView } from './components/ComparisonView';
+import { EndpointDeviceModal } from './components/EndpointDeviceModal';
 import { AlertIngestConsole, AlertInputData } from './components/AlertIngestConsole';
 import { Incident, Metrics, IncidentDetailResponse, ComparisonData } from './types';
 
@@ -29,6 +30,7 @@ export function App() {
   const [heatmapFilter, setHeatmapFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'console' | 'comparison'>('console');
   const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
@@ -289,6 +291,16 @@ export function App() {
               </button>
             </div>
 
+                        {/* Feature 1: Manage Endpoint Devices Button */}
+            <button
+              onClick={() => setIsDeviceModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-200 text-xs font-semibold border border-indigo-700/50 shadow-sm transition"
+              title="Register and Manage Endpoint Devices"
+            >
+              <Server className="w-3.5 h-3.5 text-indigo-400" />
+              Manage Endpoints ({metrics?.total_endpoints ?? 0})
+            </button>
+
             {/* Pipeline / Agent Run Buttons */}
             <button
               disabled={actionLoading !== null}
@@ -326,7 +338,7 @@ export function App() {
       {/* Main Content Body */}
       <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 space-y-4">
         {/* Executive Metrics Overview Bar */}
-        <MetricsOverview metrics={metrics} loading={loading} />
+        <MetricsOverview metrics={metrics} loading={loading} onOpenDeviceManager={() => setIsDeviceModalOpen(true)} />
 
         {viewMode === 'comparison' ? (
           <ComparisonView
@@ -375,6 +387,12 @@ export function App() {
           </div>
         )}
       </main>
+      {/* Feature 1: Register & Manage Endpoint Devices Modal */}
+      <EndpointDeviceModal
+        isOpen={isDeviceModalOpen}
+        onClose={() => setIsDeviceModalOpen(false)}
+        onDeviceUpdated={fetchData}
+      />
     </div>
   );
 }

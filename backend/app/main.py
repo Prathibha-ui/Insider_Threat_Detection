@@ -4,14 +4,14 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Depends, HTTPException, Request, status, UploadFile, File
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.database import get_db, init_db, SessionLocal
-from app.models import Alert, Incident, Evidence, AgentReasoningLog, AnalystFeedback
+from app.models import Alert, Incident, Evidence, AgentReasoningLog, AnalystFeedback, EndpointDevice
 from app.schemas import (
     FeedbackRequest,
     IngestionRequest,
@@ -24,7 +24,9 @@ from app.schemas import (
     IncidentsListResponse,
     IncidentDetailResponse,
     MetricsResponse,
-    ComparisonResponse
+    ComparisonResponse,
+    EndpointDeviceCreate,
+    EndpointDeviceResponse
 )
 from app.services.guide_loader import ingest_guide_dataset
 from app.services.ml_engine import ml_engine, execute_ml_pipeline
@@ -403,6 +405,12 @@ def get_metrics_endpoint(db: Session = Depends(get_db)):
     Returns computed metrics from the database and held-out evaluation metadata.
     Never returns hardcoded or fabricated statistics.
     """
+    # 4 Primary Administrator Metrics
+    total_endpoints = db.query(EndpointDevice).count()
+    online_endpoints = db.query(EndpointDevice).filter(EndpointDevice.status == "Online").count()
+    high_risk_devices = db.query(EndpointDevice).filter(EndpointDevice.risk_score > 70.0).count()
+    active_incidents = db.query(Incident).filter(Incident.Status != "Suppressed").count()
+
     total_alerts = db.query(Alert).count()
     total_incidents = db.query(Incident).count()
     escalated_incidents = db.query(Incident).filter(Incident.AgentAction == "Escalate").count()
@@ -434,6 +442,10 @@ def get_metrics_endpoint(db: Session = Depends(get_db)):
         tp_preservation_pct = 100.0 if total_alerts > 0 else 0.0
 
     return MetricsResponse(
+        total_endpoints=total_endpoints,
+        online_endpoints=online_endpoints,
+        high_risk_devices=high_risk_devices,
+        active_incidents=active_incidents,
         total_alerts=total_alerts,
         total_incidents=total_incidents,
         escalated_count=escalated_incidents,
@@ -609,3 +621,137 @@ def submit_feedback_endpoint(feedback: FeedbackRequest, db: Session = Depends(ge
         "updated_action": inc.AgentAction,
         "updated_risk": inc.RiskScore
     }
+
+@app.get("/api/download-code-flowchart")
+def download_code_flowchart_endpoint():
+    pdf_path = settings.BASE_DIR.parent / "Code_Workflow_Flowchart.pdf"
+    if not pdf_path.exists():
+        pdf_path = settings.BASE_DIR / "Insider_Threat_Detector_Workflow.pdf"
+    return FileResponse(path=pdf_path, media_type="application/pdf", filename="Code_Workflow_Flowchart.pdf")
+
+@app.post("/api/upload-csv")
+async def upload_csv_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Directly uploads a security telemetry CSV dataset,
+    runs ML correlation, anomaly detection & risk scoring pipeline,
+    and executes the LangGraph agent investigation loop.
+    """
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported.")
+
+    temp_path = settings.DATA_DIR / f"temp_{uuid.uuid4().hex[:6]}.csv"
+    try:
+        content = await file.read()
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
+        ingest_res = ingest_guide_dataset(temp_path, db)
+        execute_ml_pipeline(db)
+        run_agent_investigation_loop(db)
+
+        incidents = db.query(Incident).order_by(Incident.RiskScore.desc()).all()
+        return {
+            "status": "success",
+            "message": f"Successfully ingested {file.filename} with {ingest_res.get('alerts_inserted', 0)} alerts.",
+            "total_incidents": len(incidents),
+            "alerts_inserted": ingest_res.get("alerts_inserted", 0)
+        }
+    except Exception as e:
+        logger.error(f"Error processing uploaded CSV: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to process CSV: {str(e)}")
+    finally:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+
+@app.get("/api/devices", response_model=List[EndpointDeviceResponse])
+def get_devices_endpoint(db: Session = Depends(get_db)):
+    """
+    Returns registered endpoint devices with current online status,
+    department, IP address, and computed risk score.
+    """
+    devices = db.query(EndpointDevice).order_by(EndpointDevice.risk_score.desc()).all()
+    results = []
+    for d in devices:
+        alert_cnt = db.query(Alert).filter(Alert.device_id == d.device_id).count()
+        results.append(EndpointDeviceResponse(
+            id=d.id,
+            device_id=d.device_id,
+            hostname=d.hostname or d.device_id,
+            ip_address=d.ip_address or "10.0.0.1",
+            os=d.os or "Windows 11 Enterprise",
+            department=d.department or "General Corporate",
+            status=d.status or "Online",
+            risk_score=d.risk_score,
+            last_seen=d.last_seen.isoformat() if d.last_seen else None,
+            created_at=d.created_at.isoformat() if d.created_at else None,
+            alert_count=alert_cnt
+        ))
+    return results
+
+@app.post("/api/devices", response_model=EndpointDeviceResponse)
+def register_device_endpoint(payload: EndpointDeviceCreate, db: Session = Depends(get_db)):
+    """
+    Allows administrators to register and manage endpoint devices.
+    """
+    did = payload.device_id.strip()
+    existing = db.query(EndpointDevice).filter(EndpointDevice.device_id == did).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Device '{did}' is already registered in the system.")
+
+    new_device = EndpointDevice(
+        device_id=did,
+        hostname=payload.hostname.strip() if payload.hostname else f"{did.lower()}.corp.local",
+        ip_address=payload.ip_address.strip() if payload.ip_address else "10.10.1.10",
+        os=payload.os.strip() if payload.os else "Windows 11 Enterprise",
+        department=payload.department.strip() if payload.department else "General Corporate",
+        status=payload.status.strip() if payload.status else "Online",
+        risk_score=0.0,
+        last_seen=datetime.utcnow(),
+        created_at=datetime.utcnow()
+    )
+    db.add(new_device)
+    db.commit()
+    db.refresh(new_device)
+
+    return EndpointDeviceResponse(
+        id=new_device.id,
+        device_id=new_device.device_id,
+        hostname=new_device.hostname,
+        ip_address=new_device.ip_address,
+        os=new_device.os,
+        department=new_device.department,
+        status=new_device.status,
+        risk_score=new_device.risk_score,
+        last_seen=new_device.last_seen.isoformat() if new_device.last_seen else None,
+        created_at=new_device.created_at.isoformat() if new_device.created_at else None,
+        alert_count=0
+    )
+
+@app.delete("/api/devices/{device_id}")
+def delete_device_endpoint(device_id: str, db: Session = Depends(get_db)):
+    """
+    Unregisters / removes an endpoint device from the system.
+    """
+    dev = db.query(EndpointDevice).filter(EndpointDevice.device_id == device_id).first()
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    db.delete(dev)
+    db.commit()
+    return {"status": "success", "message": f"Device {device_id} removed from system."}
+
+@app.patch("/api/devices/{device_id}/status")
+def update_device_status_endpoint(device_id: str, payload: Dict[str, str], db: Session = Depends(get_db)):
+    """
+    Updates endpoint device status (Online, Offline, Isolated).
+    """
+    dev = db.query(EndpointDevice).filter(EndpointDevice.device_id == device_id).first()
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    new_status = payload.get("status")
+    if new_status:
+        dev.status = new_status
+        db.commit()
+    return {"status": "success", "device_id": device_id, "new_status": dev.status}

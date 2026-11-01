@@ -36,3 +36,10 @@ Thumbs.db
 
 # Logs
 *.log
+# Scratch preview images
+*.png
+
+# Workflow, Flowchart & Scratch Deliverables
+*.pdf
+*workflow*
+*flowchart*
