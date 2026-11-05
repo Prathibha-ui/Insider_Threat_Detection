@@ -159,35 +159,3 @@ export interface EndpointDevice {
   alert_count?: number;
 }
 
-export interface RawAlertItem {
-  id: string;
-  title: string;
-  severity: string;
-  category: string;
-  entity: string;
-  timestamp: string;
-  is_noise: boolean;
-}
-
-export interface ComparisonData {
-  raw_alerts: {
-    total_items: number;
-    sample_queue: RawAlertItem[];
-    noise_ratio: string;
-    analyst_fatigue: string;
-  };
-  socpilot_ai: {
-    total_items: number;
-    sample_queue: {
-      id: string;
-      title: string;
-      risk_score: number;
-      action: string;
-      alert_count: number;
-      predicted_grade: string;
-      entities: string[];
-    }[];
-    noise_filtered: string;
-    efficiency_gain: string;
-  };
-}

@@ -2,23 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   BrainCircuit, 
-  RefreshCw, 
-  Play, 
-  Database, 
-  SlidersHorizontal, 
-  Sparkles,
-  Layers,
-  Columns, Server
+  Server,
+  Sparkles
 } from 'lucide-react';
 
 import { MetricsOverview } from './components/MetricsOverview';
 import { RiskHeatmap } from './components/RiskHeatmap';
 import { PriorityQueue } from './components/PriorityQueue';
 import { IncidentDetail } from './components/IncidentDetail';
-import { ComparisonView } from './components/ComparisonView';
 import { EndpointDeviceModal } from './components/EndpointDeviceModal';
-import { AlertIngestConsole, AlertInputData } from './components/AlertIngestConsole';
-import { Incident, Metrics, IncidentDetailResponse, ComparisonData } from './types';
+import { Incident, Metrics, IncidentDetailResponse } from './types';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -28,9 +21,8 @@ export function App() {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [incidentDetail, setIncidentDetail] = useState<IncidentDetailResponse | null>(null);
   const [heatmapFilter, setHeatmapFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'console' | 'comparison'>('console');
-  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState<boolean>(false);
+  const [demoBanner, setDemoBanner] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
@@ -86,19 +78,6 @@ export function App() {
     }
   };
 
-  // Fetch comparison data
-  const fetchComparison = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/comparison`);
-      if (res.ok) {
-        const json = await res.json();
-        setComparisonData(json);
-      }
-    } catch (err) {
-      console.error('Failed to fetch comparison:', err);
-    }
-  };
-
   useEffect(() => {
     fetchData();
   }, []);
@@ -111,23 +90,7 @@ export function App() {
     }
   }, [selectedIncidentId]);
 
-  useEffect(() => {
-    if (viewMode === 'comparison') {
-      fetchComparison();
-    }
-  }, [viewMode]);
-
   // Actions
-  const handleRunPipeline = async () => {
-    setActionLoading('pipeline');
-    try {
-      await fetch(`${API_BASE}/api/process-pipeline`, { method: 'POST' });
-      await fetchData();
-      if (selectedIncidentId) await fetchIncidentDetail(selectedIncidentId);
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
   const handleRunAgent = async () => {
     setActionLoading('agent');
@@ -140,18 +103,27 @@ export function App() {
     }
   };
 
-  const handleReloadDataset = async () => {
-    setActionLoading('dataset');
+  const handleRunDemo = async () => {
+    setActionLoading('demo');
     try {
-      await fetch(`${API_BASE}/api/load-guide-dataset`, { method: 'POST' });
-      await fetch(`${API_BASE}/api/process-pipeline`, { method: 'POST' });
-      await fetch(`${API_BASE}/api/run-agent`, { method: 'POST' });
-      await fetchData();
-      if (selectedIncidentId) await fetchIncidentDetail(selectedIncidentId);
+      const res = await fetch(`${API_BASE}/api/run-random-demo`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        await fetchData();
+        if (data.incident_id) {
+          setSelectedIncidentId(data.incident_id);
+          await fetchIncidentDetail(data.incident_id);
+        }
+        setDemoBanner(data.message || `Demo executed on ${data.device_id}: ${data.threat_title}`);
+        setTimeout(() => setDemoBanner(null), 9000);
+      }
+    } catch (err) {
+      console.error('Failed to run demo:', err);
     } finally {
       setActionLoading(null);
     }
   };
+
 
   const handleFeedbackSubmit = async (
     incidentId: string,
@@ -174,69 +146,6 @@ export function App() {
       await fetchIncidentDetail(incidentId);
     } catch (err) {
       console.error('Failed to submit analyst feedback:', err);
-    }
-  };
-
-  const handleIngestAlert = async (payload: AlertInputData) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/ingest-alert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        return { success: false, message: 'Server error while ingesting alert.' };
-      }
-
-      const data = await res.json();
-      await fetchData();
-
-      if (data.incident_id) {
-        setSelectedIncidentId(data.incident_id);
-        await fetchIncidentDetail(data.incident_id);
-      }
-
-      return {
-        success: true,
-        incident_id: data.incident_id,
-        message: data.message
-      };
-    } catch (err: any) {
-      console.error('Failed to ingest alert:', err);
-      return { success: false, message: err?.message || 'Network error' };
-    }
-  };
-
-  const handleIngestBatch = async (alerts: AlertInputData[]) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/ingest-batch-alerts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alerts })
-      });
-
-      if (!res.ok) {
-        return { success: false, message: 'Server error ingesting batch alerts.' };
-      }
-
-      const data = await res.json();
-      await fetchData();
-      return { success: true, message: data.message };
-    } catch (err: any) {
-      console.error('Failed to ingest batch:', err);
-      return { success: false, message: err?.message || 'Network error' };
-    }
-  };
-
-  const handleClearAllData = async () => {
-    try {
-      await fetch(`${API_BASE}/api/clear-data`, { method: 'POST' });
-      setSelectedIncidentId(null);
-      setIncidentDetail(null);
-      await fetchData();
-    } catch (err) {
-      console.error('Failed to clear data:', err);
     }
   };
 
@@ -267,30 +176,6 @@ export function App() {
 
           {/* Quick Action Controls */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* View Switcher */}
-            <div className="flex items-center bg-slate-900 rounded-lg p-1 border border-border text-xs mr-2">
-              <button
-                onClick={() => setViewMode('console')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition font-medium ${
-                  viewMode === 'console'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" /> Threat Console
-              </button>
-              <button
-                onClick={() => setViewMode('comparison')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition font-medium ${
-                  viewMode === 'comparison'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Columns className="w-3.5 h-3.5" /> Triage Comparison
-              </button>
-            </div>
-
                         {/* Feature 1: Manage Endpoint Devices Button */}
             <button
               onClick={() => setIsDeviceModalOpen(true)}
@@ -302,15 +187,6 @@ export function App() {
             </button>
 
             {/* Pipeline / Agent Run Buttons */}
-            <button
-              disabled={actionLoading !== null}
-              onClick={handleRunPipeline}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-              title="Re-run 6-Model ML Pipeline"
-            >
-              <SlidersHorizontal className={`w-3.5 h-3.5 ${actionLoading === 'pipeline' ? 'animate-spin text-blue-400' : ''}`} />
-              Run ML Pipeline
-            </button>
 
             <button
               disabled={actionLoading !== null}
@@ -322,39 +198,48 @@ export function App() {
               Execute Agent
             </button>
 
+            {/* Run Demo Button */}
             <button
               disabled={actionLoading !== null}
-              onClick={handleReloadDataset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-border transition"
-              title="Reload Microsoft GUIDE Benchmark"
+              onClick={handleRunDemo}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition border border-purple-400/30"
+              title="Select a random device, simulate an insider threat, and produce all outputs"
             >
-              <RefreshCw className={`w-3 h-3 ${actionLoading === 'dataset' ? 'animate-spin' : ''}`} />
-              Reload GUIDE
+              <Sparkles className={`w-3.5 h-3.5 ${actionLoading === 'demo' ? 'animate-spin' : ''}`} />
+              Run Demo
             </button>
+
           </div>
         </div>
       </header>
 
       {/* Main Content Body */}
       <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 space-y-4">
+        {/* Run Demo Notification Banner */}
+        {demoBanner && (
+          <div className="bg-gradient-to-r from-purple-950/80 via-indigo-950/80 to-slate-900 border border-purple-500/40 rounded-xl p-3 flex items-center justify-between text-xs text-purple-200 shadow-lg shadow-purple-950/40">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 rounded-lg bg-purple-600/30 text-purple-300 border border-purple-400/40">
+                <Sparkles className="w-4 h-4 text-purple-300" />
+              </span>
+              <div>
+                <span className="font-bold text-white uppercase tracking-wider text-[11px] mr-2">Demo Triggered:</span>
+                <span>{demoBanner}</span>
+              </div>
+            </div>
+            <button 
+              onClick={() => setDemoBanner(null)} 
+              className="text-purple-400 hover:text-white px-2 py-0.5 text-xs font-semibold rounded bg-purple-900/40 transition"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Executive Metrics Overview Bar */}
         <MetricsOverview metrics={metrics} loading={loading} onOpenDeviceManager={() => setIsDeviceModalOpen(true)} />
 
-        {viewMode === 'comparison' ? (
-          <ComparisonView
-            data={comparisonData}
-            loading={loading}
-            onClose={() => setViewMode('console')}
-          />
-        ) : (
-          <div className="space-y-4">
-            <AlertIngestConsole
-              onIngestAlert={handleIngestAlert}
-              onIngestBatch={handleIngestBatch}
-              onClearAllData={handleClearAllData}
-              loading={loading}
-              totalIncidents={incidents.length}
-            />
+        <div className="space-y-4">
 
             {/* Small Risk Heat Map (Specifically requested!) */}
             <RiskHeatmap
@@ -385,7 +270,6 @@ export function App() {
               </div>
             </div>
           </div>
-        )}
       </main>
       {/* Feature 1: Register & Manage Endpoint Devices Modal */}
       <EndpointDeviceModal

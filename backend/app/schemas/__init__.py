@@ -202,19 +202,6 @@ class MetricsResponse(BaseModel):
     evaluation_type: str = "Measured metrics from active pipeline"
     model_metrics: Optional[Dict[str, Any]] = None
 
-class RawAlertItem(BaseModel):
-    id: str
-    title: str
-    severity: str
-    category: str
-    entity: str
-    timestamp: str
-    is_noise: bool
-
-class ComparisonResponse(BaseModel):
-    raw_alerts: Dict[str, Any]
-    socpilot_ai: Dict[str, Any]
-
 class EndpointDeviceCreate(BaseModel):
     device_id: str
     hostname: Optional[str] = None
