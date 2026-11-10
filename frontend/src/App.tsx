@@ -13,7 +13,7 @@ import { IncidentDetail } from './components/IncidentDetail';
 import { EndpointDeviceModal } from './components/EndpointDeviceModal';
 import { Incident, Metrics, IncidentDetailResponse } from './types';
 
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 export function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);

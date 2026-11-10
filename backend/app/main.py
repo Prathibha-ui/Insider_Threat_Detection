@@ -66,24 +66,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/")
-def root():
-    return {
-        "app": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "status": "online"
-    }
 
 @app.get("/api/health", response_model=HealthResponse)
 def health_endpoint(db: Session = Depends(get_db)):
@@ -807,3 +794,25 @@ def update_device_status_endpoint(device_id: str, payload: Dict[str, str], db: S
         dev.status = new_status
         db.commit()
     return {"status": "success", "device_id": device_id, "new_status": dev.status}
+
+# -------------------------------------------------------------
+# Static Frontend Files Mount (Single-Service Full Stack Deployment)
+# -------------------------------------------------------------
+from fastapi.staticfiles import StaticFiles
+
+# Support both local workspace layout and Docker container layout
+frontend_dist = settings.BASE_DIR.parent / "frontend" / "dist"
+if not frontend_dist.exists():
+    frontend_dist = settings.BASE_DIR / "frontend" / "dist"
+
+if frontend_dist.exists() and (frontend_dist / "index.html").exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {
+            "app": settings.PROJECT_NAME,
+            "version": settings.VERSION,
+            "status": "online",
+            "docs": "/docs"
+        }

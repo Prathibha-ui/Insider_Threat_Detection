@@ -22,7 +22,7 @@ interface Props {
   onDeviceUpdated?: () => void;
 }
 
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 export const EndpointDeviceModal: React.FC<Props> = ({ isOpen, onClose, onDeviceUpdated }) => {
   const [devices, setDevices] = useState<EndpointDevice[]>([]);

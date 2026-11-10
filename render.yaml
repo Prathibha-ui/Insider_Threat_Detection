@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: insider-threat-detector
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 10000
