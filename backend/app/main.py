@@ -36,12 +36,75 @@ from app.services.correlation import correlation_engine
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("socpilot")
 
+def seed_initial_data_if_empty(db: Session):
+    """
+    If database has no alerts or devices (e.g. fresh cloud deployment on Render/Railway),
+    automatically seeds the baseline GUIDE telemetry dataset, runs ML clustering &
+    LangGraph agent investigations, and populates the endpoint devices fleet.
+    """
+    try:
+        alert_count = db.query(Alert).count()
+        device_count = db.query(EndpointDevice).count()
+        if alert_count > 0 and device_count > 0:
+            return
+
+        logger.info("Fresh cloud deployment detected. Automatically seeding baseline telemetry & devices...")
+        if alert_count == 0:
+            ingest_guide_dataset(db=db)
+            execute_ml_pipeline(db)
+            run_agent_investigation_loop(db)
+
+        # Populate EndpointDevices if empty
+        if db.query(EndpointDevice).count() == 0:
+            alerts = db.query(Alert).all()
+            device_alerts = {}
+            for a in alerts:
+                did = a.device_id or a.DeviceId or "DEV-UNKNOWN"
+                if did not in device_alerts:
+                    device_alerts[did] = []
+                device_alerts[did].append(a)
+
+            import random
+            for did, a_list in device_alerts.items():
+                max_risk = max([a.risk_score or 0.0 for a in a_list] or [0.0])
+                last_ip = next((a.ip_address for a in a_list if a.ip_address and a.ip_address != "0.0.0.0"), f"10.10.{random.randint(1, 99)}.{random.randint(2, 250)}")
+                
+                dept = "Corporate Workstation"
+                if "FIN" in did: dept = "Finance"
+                elif "ENG" in did: dept = "Engineering"
+                elif "HR" in did: dept = "Human Resources"
+                elif "DC" in did or "AUTH" in did: dept = "Domain Controller / IAM"
+                elif "BUILD" in did or "SRV" in did: dept = "Infrastructure / Production"
+                elif "MGMT" in did: dept = "Executive Management"
+                elif "MKT" in did: dept = "Marketing & Sales"
+
+                status = "Isolated" if max_risk >= 85.0 else ("Online" if random.random() > 0.12 else "Offline")
+
+                dev = EndpointDevice(
+                    device_id=did,
+                    hostname=f"{did.lower()}.corp.local",
+                    ip_address=last_ip,
+                    os="Windows 11 Enterprise" if "WS" in did or "W10" in did else "Ubuntu 22.04 LTS" if "SRV" in did else "Windows Server 2022",
+                    department=dept,
+                    status=status,
+                    risk_score=round(max_risk, 1),
+                    last_seen=datetime.utcnow(),
+                    created_at=datetime.utcnow()
+                )
+                db.add(dev)
+            db.commit()
+            logger.info(f"Successfully seeded {len(device_alerts)} endpoint devices.")
+    except Exception as e:
+        logger.error(f"Error seeding initial data: {e}", exc_info=True)
+        db.rollback()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing SOCPilot backend services...")
     init_db()
-    # Ready for user input - no forced demo data ingestion on startup
+    with SessionLocal() as db:
+        seed_initial_data_if_empty(db)
     logger.info("SOCPilot backend ready. Awaiting telemetry and user inputs.")
     yield
     # Shutdown
